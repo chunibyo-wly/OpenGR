@@ -104,12 +104,16 @@ public:
 
     _gcenter = bbox.center();
     // add a delta to avoid to have elements with coordinate = 1
+    // diagonal 返回的是一个运算最大减去最小的运算表达式子
+    // maxCoeff 取出最大对角最大元素/最长边
+    // 当最长边等于单位一时，可能会有点刚好在单位box上
     _ratio = bbox.diagonal().maxCoeff() + 0.001;
 
     // update point cloud (worldToUnit use the ratio and gravity center
     // previously computed)
     // Generate primitives
     for (unsigned int i = 0; i < nSamples; ++i) {
+      // 缩放，点云中心不在原点，xyz 都平移了 0.5
       points[i] = worldToUnit(points[i]);
 
       primitives.emplace_back(points[i], Scalar(1.));

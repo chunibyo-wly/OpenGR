@@ -159,6 +159,7 @@ IntersectionFunctor<Primitive, Point, dim, Scalar>::process(
     childNodes->clear();
 
 //#pragma omp parallel
+    // 判断每个 node(方块) 是否和 点云的点所在的球体相交，只要有一个相交的就分裂方块后跳出
     for(typename NodeContainer::iterator nit  = nodes->begin();
                                                nit != nodes->end(); nit++){
       Node &n = *nit;
@@ -171,6 +172,7 @@ IntersectionFunctor<Primitive, Point, dim, Scalar>::process(
         if ((*pit).intersect(n.center(), edgeHalfLength+epsilon)){
           // There is two options now: either there is already few points in the
           // current node, in that case we stop splitting it, or we split.
+          // 点的数目过少的话，这个方块就不再分裂了
           if (n.rangeLength() > int(minNodeSize)){
 //#pragma omp critical
             n.split(*childNodes, edgeHalfLength);
@@ -189,6 +191,8 @@ IntersectionFunctor<Primitive, Point, dim, Scalar>::process(
   ResContainer results;
   results.reserve(childNodes->size());
 
+  // 上面是直接总体计算了所有 点云点 造成的方块的分裂，没有一一匹配上
+  // 这里重新遍历一次，记录匹配
   unsigned int pId = 0;
   for(typename PrimitiveContainer::const_iterator itP = M.begin();
       itP != M.end(); itP++, pId++){
@@ -199,6 +203,7 @@ IntersectionFunctor<Primitive, Point, dim, Scalar>::process(
 
         functor.beginPrimitiveCollect(pId);
         for(unsigned int j = 0; j!= (unsigned int)((*itN).rangeLength()); j++){
+          // 使用顺序控制点对的不重复, 只有 a->b, 没有 b->a
           if(pId>(*itN).idInRange(j))
             if((*itP).intersectPoint((*itN).pointInRange(j),epsilon))
               functor.process(pId, (*itN).idInRange(j));

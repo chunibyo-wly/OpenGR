@@ -157,6 +157,9 @@ NdNode< Point, _dim, Scalar, _PointContainer, _IdContainer>::_split(
   Scalar splitValue)
 {
   int l(start), r(end-1);
+  // 在 xyz 轴上，分别进行 8 叉树划分点
+  // 将小于 splitvalue 的点放到左边，大于的放到右边
+  // 在第一次划分时，中心点就是 0.5，会处理所有点
   for ( ; l<r ; ++l, --r)
   {
     while (l < end && _points[_ids[l]][dim] < splitValue)
@@ -167,7 +170,7 @@ NdNode< Point, _dim, Scalar, _PointContainer, _IdContainer>::_split(
         break;
     std::swap(_ids[l],_ids[r]);
   }
-  if(l>=end) return end;
+  if(l>=end) return end; // 如果所有点都在中值左边，说明所有点都被分到一侧了
   return _points[_ids[l]][dim] < splitValue ? l+1 : l;
 }
 
@@ -188,6 +191,11 @@ NdNode< Point, _dim, Scalar, _PointContainer, _IdContainer>::split(
     std::vector< NdNode<Point, _dim, Scalar, _PointContainer, _IdContainer> > &childs,
     Scalar rootEdgeHalfLength )
 {
+  // 这个算法主要目的是分割，将当前的 box 进行八叉划分
+  // 首先将 xyz 投影到同一维度上，用 中值 的左右两侧表示第几块
+  // 首先按 x 分成 2 段
+  // 然后按 y 再将 x 的2段分为 4 段
+  // 同样 z 会得到 8 段
   typedef NdNode<Point, _dim, Scalar, _PointContainer, _IdContainer> Node;
 
   //! Compute number of childs at compile time
@@ -199,10 +207,16 @@ NdNode< Point, _dim, Scalar, _PointContainer, _IdContainer>::split(
 
   /// Split successively along all the dimensions of the ambiant space
   /// This algorithm cannot be parallelized
+  // Dim: 这个分点算法可以适用于多维 >3 情况
+  // d: xyz 维度
   for(unsigned int d = 0; d < Dim; d++){
+    // 2, 4, 8
     const unsigned int nbInterval   = Utils::POW(int(2),int(d+1)); // can be deduced at
+    // 1, 2, 4
     const unsigned int nbSplit      = nbInterval/2;         // compile time with
+    // 8, 4, 2
     const unsigned int intervalNode = nbNode / nbSplit;     // loop unrollement
+    // 4, 2, 1
     const unsigned int midNode      = nbNode / nbInterval;
 
     /// Iterate over all splits and compute them for the current dimension
@@ -216,10 +230,12 @@ NdNode< Point, _dim, Scalar, _PointContainer, _IdContainer>::split(
                                           childs[endNodeId-1]._end,
                                           d,
                                           currentCenterD);
+      // 普通的八叉树中心计算
       const Scalar beforeCenterD = currentCenterD - rootEdgeHalfLength/Scalar(2);
       const Scalar afterCenterD  = currentCenterD + rootEdgeHalfLength/Scalar(2);
 
       /// Transmit the split to the related nodes
+      // 将当前计算的部分点云分为两段，给下一个维度使用
       for (unsigned int i = beginNodeId; i != beginNodeId + midNode; i++){
         childs[i]._center[d] = beforeCenterD;
         childs[i]._end       = splitId;
